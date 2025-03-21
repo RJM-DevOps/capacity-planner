@@ -1,0 +1,10 @@
+.pi-row .MuiDataGrid-cell {
+    background-color: #e3f2fd;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.sprint-row .MuiDataGrid-cell {
+    background-color: #f9f9f9;
+    padding-left: 16px;
+}

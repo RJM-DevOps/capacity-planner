@@ -8,3 +8,31 @@
     background-color: #f9f9f9;
     padding-left: 16px;
 }
+
+.weekday-label,
+.weekday-cell {
+    min-width: 32px;
+    max-width: 40px;
+    text-align: center;
+    padding: 4px;
+    box-sizing: border-box;
+}
+
+.pi-header,
+.sprint-header {
+    display: grid;
+    grid-template-columns: 100px 1fr 1fr;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 4px;
+}
+
+.pi-header {
+    background-color: #f0f0f0;
+}
+
+.sprint-header {
+    background-color: #e0e0e0;
+}
+

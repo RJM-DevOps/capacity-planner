@@ -184,8 +184,8 @@ const AdminPanel = ({ addPi, pis }) => {
                                             <TableCell>Finish</TableCell>
                                             <TableCell>Who</TableCell>
                                             <TableCell>Team Days Out</TableCell>
-                                            <TableCell>Individual Days Out</TableCell>
-                                            <TableCell>Individual Days Avail</TableCell>
+                                            <TableCell>Member Days Out</TableCell>
+                                            <TableCell>Member Days Avail</TableCell>
                                             <TableCell>Total Capacity</TableCell>
                                             <TableCell>Estimate</TableCell>
                                             <TableCell>Planned</TableCell>

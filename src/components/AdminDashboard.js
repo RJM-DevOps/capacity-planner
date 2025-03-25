@@ -1,28 +1,18 @@
-// AdminDashboard.js — uses nested routing for Panel and Grid views
 import React, { useState, useEffect } from "react";
-import { Box, Button, ButtonGroup, Typography } from "@mui/material";
+import { Box, Button, ButtonGroup } from "@mui/material";
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import CapacityGrid from "./CapacityGrid";
 import AdminPanel from "./AdminPanel";
+import AdminConfigPanel from "./AdminConfigPanel";
 
-const AdminDashboard = () => {
-    const [pis, setPis] = useState(() => {
-        const stored = localStorage.getItem("pis");
-        return stored ? JSON.parse(stored) : [];
-    });
-
+const AdminDashboard = ({ pis, addPi }) => {
     const navigate = useNavigate();
     const location = useLocation();
+    const [role, setRole] = useState(null);
 
     useEffect(() => {
-        localStorage.setItem("pis", JSON.stringify(pis));
-    }, [pis]);
-
-    const addPi = (newPi) => {
-        const updatedPis = [...pis, newPi];
-        setPis(updatedPis);
-        localStorage.setItem("pis", JSON.stringify(updatedPis));
-    };
+        setRole(localStorage.getItem("role"));
+    }, []);
 
     return (
         <Box sx={{ height: "100vh", width: "100%", p: 2 }}>
@@ -40,12 +30,21 @@ const AdminDashboard = () => {
                     >
                         Admin Panel
                     </Button>
+                    {role === "admin" && (
+                        <Button
+                            onClick={() => navigate("/admin/config")}
+                            variant={location.pathname === "/admin/config" ? "contained" : "outlined"}
+                        >
+                            Admin Config
+                        </Button>
+                    )}
                 </ButtonGroup>
             </Box>
 
             <Routes>
                 <Route path="/panel" element={<AdminPanel addPi={addPi} pis={pis} />} />
                 <Route path="/capacity" element={<CapacityGrid pis={pis} />} />
+                <Route path="/config" element={<AdminConfigPanel />} />
             </Routes>
         </Box>
     );

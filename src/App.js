@@ -1,11 +1,12 @@
-// App.js — updated routing to support nested admin views
 import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Route, Routes, Navigate } from "react-router-dom";
 import CapacityGrid from "./components/CapacityGrid";
 import AdminPanel from "./components/AdminPanel";
+import AdminDashboard from "./components/AdminDashboard";
+import AdminConfigPanel from "./components/AdminConfigPanel";
 import Login from "./components/Login";
 import { Box } from "@mui/material";
-import AdminDashboard from "./components/AdminDashboard";
+import { getPis, setPis } from "./utils/StorageProvider";
 
 const PrivateRoute = ({ element, allowedRoles }) => {
     const role = localStorage.getItem("role");
@@ -13,21 +14,31 @@ const PrivateRoute = ({ element, allowedRoles }) => {
 };
 
 const App = () => {
-    const [pis, setPis] = useState(() => {
-        const storedPis = localStorage.getItem("pis");
-        return storedPis ? JSON.parse(storedPis) : [];
-    });
+    const [pis, setPisState] = useState([]);
+    const [isLoaded, setIsLoaded] = useState(false);
 
+    // Load pis from storageProvider on mount
     useEffect(() => {
-        localStorage.setItem("pis", JSON.stringify(pis));
-    }, [pis]);
+        const loadPis = async () => {
+            const data = await getPis();
+            if (data?.length > 0) {
+                setPisState(data);
+            }
+            setIsLoaded(true);
+        };
+        loadPis();
+    }, []);
+
+    // Only save when loaded AND pis is non-empty
+    useEffect(() => {
+        if (isLoaded && pis.length > 0) {
+            setPis(pis);
+        }
+    }, [pis, isLoaded]);
 
     const addPi = (newPi) => {
-        setPis((prevPis) => {
-            const updatedPis = [...prevPis, newPi];
-            localStorage.setItem("pis", JSON.stringify(updatedPis));
-            return updatedPis;
-        });
+        const updated = [...pis, newPi];
+        setPisState(updated);
     };
 
     return (
@@ -37,7 +48,11 @@ const App = () => {
                     <Route path="/" element={<Login />} />
                     <Route
                         path="/admin/*"
-                        element={<PrivateRoute element={<AdminDashboard />} allowedRoles={["admin"]} />}
+                        element={<PrivateRoute element={<AdminDashboard pis={pis} addPi={addPi} />} allowedRoles={["admin"]} />}
+                    />
+                    <Route
+                        path="/admin/config"
+                        element={<PrivateRoute element={<AdminConfigPanel />} allowedRoles={["admin"]} />}
                     />
                     <Route
                         path="/capacity"

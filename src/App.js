@@ -6,7 +6,7 @@ import AdminDashboard from "./components/AdminDashboard";
 import AdminConfigPanel from "./components/AdminConfigPanel";
 import Login from "./components/Login";
 import { Box } from "@mui/material";
-import { getPis, setPis } from "./utils/StorageProvider";
+import { getPis, setPis } from "./utils/storageProvider";
 
 const PrivateRoute = ({ element, allowedRoles }) => {
     const role = localStorage.getItem("role");

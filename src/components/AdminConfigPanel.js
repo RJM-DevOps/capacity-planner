@@ -1,4 +1,3 @@
-// AdminConfigPanel.js — supports memberId selection and directory tab for PTO/LOA/Other + full localStorage integration + dropdown for Who in Capacity Grid
 import React, { useState, useEffect } from "react";
 import {
     Box,
@@ -18,15 +17,18 @@ import {
     MenuItem,
     Select,
     InputLabel,
-    FormControl
+    FormControl,
+    Tooltip
 } from "@mui/material";
-import { Delete, Add } from "@mui/icons-material";
+import { Delete, Add, ArrowUpward, ArrowDownward, InfoOutlined } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
+import { Switch } from "@mui/material";
 
-const CATEGORIES = ["Holidays", "Company Days", "PTO", "LOA", "Other", "Team Members"];
+const CATEGORIES = ["Holidays", "Company Days", "PTO", "LOA", "Other", "Adjustments", "Team Members"];
 const STORAGE_KEY = "configData";
 const MEMBER_KEY = "memberDirectory";
+const SORT_KEY = "sortState";
 
 const defaultData = {
     "Holidays": [],
@@ -34,6 +36,7 @@ const defaultData = {
     "PTO": [],
     "LOA": [],
     "Other": [],
+    "Adjustments": [],
     "Team Members": []
 };
 
@@ -41,11 +44,17 @@ const AdminConfigPanel = () => {
     const [tab, setTab] = useState(0);
     const [configData, setConfigData] = useState(() => {
         const stored = localStorage.getItem(STORAGE_KEY);
-        return stored ? JSON.parse(stored) : defaultData;
+        const parsed = stored ? JSON.parse(stored) : {};
+        return { ...defaultData, ...parsed };
     });
+
     const [members, setMembers] = useState(() => {
         const stored = localStorage.getItem(MEMBER_KEY);
         return stored ? JSON.parse(stored) : [];
+    });
+    const [sortState, setSortState] = useState(() => {
+        const stored = localStorage.getItem(SORT_KEY);
+        return stored ? JSON.parse(stored) : {};
     });
 
     const navigate = useNavigate();
@@ -59,6 +68,10 @@ const AdminConfigPanel = () => {
         localStorage.setItem(MEMBER_KEY, JSON.stringify(members));
     }, [members]);
 
+    useEffect(() => {
+        localStorage.setItem(SORT_KEY, JSON.stringify(sortState));
+    }, [sortState]);
+
     const handleAddRow = () => {
         const category = CATEGORIES[tab];
         let newRow;
@@ -66,9 +79,13 @@ const AdminConfigPanel = () => {
         if (category === "Holidays" || category === "Company Days") {
             newRow = { date: "", description: "" };
         } else if (category === "Team Members") {
-            newRow = { id: uuidv4(), name: "" };
-            setMembers((prev) => [...prev, newRow]);
+        newRow = { id: uuidv4(), name: "", includeInCalc: true };
+        setMembers((prev) => [...prev, newRow]);
             return;
+        } else if (category === "Other") {
+            newRow = { memberId: "", date: "", comments: "" };
+        } else if (category === "Adjustments") {
+            newRow = { memberId: "", date: "", reason: "", offset: "" };
         } else {
             newRow = { memberId: "", date: "" };
         }
@@ -111,22 +128,70 @@ const AdminConfigPanel = () => {
         }
     };
 
+    const handleSort = (field) => {
+        const category = CATEGORIES[tab];
+        const current = sortState[category]?.field === field ? sortState[category].direction : null;
+        const direction = current === "asc" ? "desc" : "asc";
+
+        const sorted = [...configData[category]].sort((a, b) => {
+            let aVal = a[field];
+            let bVal = b[field];
+
+            if (field === "memberId") {
+                const getName = (id) => members.find((m) => m.id === id)?.name || "";
+                aVal = getName(aVal).toLowerCase();
+                bVal = getName(bVal).toLowerCase();
+            } else {
+                aVal = (aVal || '').toLowerCase?.() || aVal;
+                bVal = (bVal || '').toLowerCase?.() || bVal;
+            }
+
+            if (aVal < bVal) return direction === "asc" ? -1 : 1;
+            if (aVal > bVal) return direction === "asc" ? 1 : -1;
+            return 0;
+        });
+
+        setConfigData((prev) => ({ ...prev, [category]: sorted }));
+        setSortState((prev) => ({
+            ...prev,
+            [category]: { field, direction }
+        }));
+    };
+
     const renderTable = () => {
         const category = CATEGORIES[tab];
         const rows = category === "Team Members" ? members : configData[category];
 
         let headers;
-        if (category === "Team Members") headers = ["Name", "ID"];
+        if (category === "Team Members") headers = ["Name", "ID", "Include in Capacity"];
         else if (category === "Holidays" || category === "Company Days") headers = ["Date", "Description"];
+        else if (category === "Other") headers = ["Member", "Date", "Comments"];
+        else if (category === "Adjustments") headers = ["Member", "Date", "Reason", "Daily Capacity Hour Offset"];
         else headers = ["Member", "Date"];
 
         return (
             <Table component={Paper} sx={{ mt: 2 }}>
                 <TableHead>
                     <TableRow>
-                        {headers.map((head) => (
-                            <TableCell key={head}>{head}</TableCell>
-                        ))}
+                        {headers.map((head) => {
+                            const field = head === "Comments" || head === "Reason" || head === "Daily Capacity Hour Offset"
+                                ? head === "Daily Capacity Hour Offset" ? "offset" : head.toLowerCase()
+                                : head.toLowerCase().includes("member") ? "memberId" : head.toLowerCase();
+
+                            return (
+                                <TableCell key={head} onClick={() => handleSort(field)} sx={{ cursor: "pointer" }}>
+                                    {head}
+                                    {head === "Daily Capacity Hour Offset" && (
+                                        <Tooltip title="Daily adjusted max capacity per team member.">
+                                            <InfoOutlined sx={{ fontSize: 16, ml: 0.5 }} />
+                                        </Tooltip>
+                                    )}
+                                    {sortState[category]?.field === field && (
+                                        sortState[category].direction === "asc" ? <ArrowUpward fontSize="small" /> : <ArrowDownward fontSize="small" />
+                                    )}
+                                </TableCell>
+                            );
+                        })}
                         <TableCell>Action</TableCell>
                     </TableRow>
                 </TableHead>
@@ -135,11 +200,22 @@ const AdminConfigPanel = () => {
                         <TableRow key={idx}>
                             {headers.map((head, colIdx) => {
                                 let field;
-                                if (category === "Team Members") field = head === "Name" ? "name" : "id";
-                                else field = head.toLowerCase().includes("member") ? "memberId" : head.toLowerCase();
+                                if (category === "Team Members") {
+                                    if (head === "Name") field = "name";
+                                    else if (head === "ID") field = "id";
+                                    else if (head === "Include in Capacity") field = "includeInCalc";
+                                } else if (
+                                    (category === "Other" || category === "Adjustments") &&
+                                    (head === "Comments" || head === "Reason" || head === "Daily Capacity Hour Offset")
+                                ) {
+                                    field = head === "Daily Capacity Hour Offset" ? "offset" : head.toLowerCase();
+                                } else {
+                                    field = head.toLowerCase().includes("member") ? "memberId" : head.toLowerCase();
+                                }
 
                                 const isDate = field === "date";
                                 const isDisabled = category === "Team Members" && field === "id";
+                                const isNumeric = field === "offset";
 
                                 return (
                                     <TableCell key={colIdx}>
@@ -158,10 +234,16 @@ const AdminConfigPanel = () => {
                                                     ))}
                                                 </Select>
                                             </FormControl>
+                                        ) : field === "includeInCalc" ? (
+                                            <Switch
+                                                checked={!!row[field]}
+                                                onChange={(e) => handleChange(idx, field, e.target.checked)}
+                                                color="primary"
+                                            />
                                         ) : (
                                             <TextField
                                                 fullWidth
-                                                type={isDate ? "date" : "text"}
+                                                type={isDate ? "date" : isNumeric ? "number" : "text"}
                                                 value={row[field] || ""}
                                                 onChange={(e) => handleChange(idx, field, e.target.value)}
                                                 variant="standard"
@@ -179,6 +261,7 @@ const AdminConfigPanel = () => {
                         </TableRow>
                     ))}
                 </TableBody>
+
             </Table>
         );
     };

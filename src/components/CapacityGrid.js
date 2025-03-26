@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { Box, Typography, TextField, IconButton, Collapse, Button, MenuItem, Select } from "@mui/material";
+import { Box, Typography, TextField, IconButton, Collapse, Button, MenuItem, Select, Tooltip } from "@mui/material";
 import { getPis, setPis } from "../utils/StorageProvider";
 import { format, eachDayOfInterval, parseISO } from "date-fns";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import "./CapacityGrid.css";
 
 const impactColors = {
@@ -30,11 +32,13 @@ const enrichPis = (pis, config) => {
     const ptoData = config.PTO || [];
     const loaData = config.LOA || [];
     const otherData = config.Other || [];
+    const holidays = config["Holidays"]?.map(h => h.date) || [];
+    const companyDays = config["Company Days"]?.map(d => d.date) || [];
 
     return pis.map((pi) => ({
         ...pi,
-        holidays: pi.holidays || [],
-        companyDays: pi.companyDays || [],
+        holidays,
+        companyDays,
         sprints: pi.sprints.map((sprint) => ({
             ...sprint,
             team: (sprint.team || []).map((member) => {
@@ -51,7 +55,7 @@ const enrichPis = (pis, config) => {
 };
 
 const CapacityGrid = () => {
-    const [configData, setConfigData] = useState({ PTO: [], LOA: [], Other: [] });
+    const [configData, setConfigData] = useState({ PTO: [], LOA: [], Other: [], Holidays: [], "Company Days": [] });
     const [expandedPIs, setExpandedPIs] = useState({});
     const [expandedSprints, setExpandedSprints] = useState({});
     const [piData, setPiData] = useState([]);
@@ -91,28 +95,48 @@ const CapacityGrid = () => {
         return "#e0e0e0";
     };
 
+    const toggleAllSprints = (piId, expand) => {
+        const pi = piData.find(p => p.id === piId);
+        if (!pi) return;
+        const updates = {};
+        for (let sprint of pi.sprints) {
+            updates[sprint.id] = expand;
+        }
+        setExpandedSprints(prev => ({ ...prev, ...updates }));
+    };
+
     return (
         <Box sx={{ p: 3 }}>
             <Typography variant="h5" gutterBottom>Capacity Planning Grid</Typography>
             {piData.map((pi, piIndex) => (
                 <Box key={pi.id} sx={{ mb: 3 }}>
-                    <Box
-                        onClick={() => setExpandedPIs((prev) => ({ ...prev, [pi.id]: !prev[pi.id] }))}
-                        sx={{ display: "grid", gridTemplateColumns: "200px 150px 150px", fontWeight: "bold", backgroundColor: "#a8a9ab", p: 1, borderRadius: 1, cursor: "pointer" }}
-                    >
-                        <Box>{expandedPIs[pi.id] ? "▼" : "▶"} {pi.pi}</Box>
+                    <Box sx={{ display: "grid", gridTemplateColumns: "200px 150px 150px 1fr", fontWeight: "bold", backgroundColor: "#a8a9ab", p: 1, borderRadius: 1 }}>
+                        <Box onClick={() => setExpandedPIs(prev => ({ ...prev, [pi.id]: !prev[pi.id] }))} sx={{ cursor: "pointer" }}>
+                            {expandedPIs[pi.id] ? "▼" : "▶"} {pi.pi}
+                        </Box>
                         <Box>{format(parseISO(pi.start), "MM/dd/yy")}</Box>
                         <Box>{format(parseISO(pi.end), "MM/dd/yy")}</Box>
+                        <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
+                        <Button
+                                size="small"
+                                onClick={() => toggleAllSprints(pi.id, !Object.values(expandedSprints).some(v => v))}
+                                startIcon={Object.values(expandedSprints).some(v => v) ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                                sx={{ color: "white", borderColor: "white" }}
+                                variant="outlined"
+                            >
+                                Toggle Sprints
+                            </Button>
+                        </Box>
                     </Box>
 
-                    {expandedPIs[pi.id] && pi.sprints?.map((sprint, sprintIndex) => {
+                    {expandedPIs[pi.id] && pi.sprints.map((sprint, sprintIndex) => {
                         const weekdays = generateSprintDateColumns(sprint.start, sprint.end);
                         const dateColumnCount = weekdays.length;
 
                         return (
                             <Box key={sprint.id} sx={{ mt: 2, ml: 2 }}>
                                 <Box
-                                    onClick={() => setExpandedSprints((prev) => ({ ...prev, [sprint.id]: !prev[sprint.id] }))}
+                                    onClick={() => setExpandedSprints(prev => ({ ...prev, [sprint.id]: !prev[sprint.id] }))}
                                     sx={{ display: "grid", gridTemplateColumns: "185px 150px 150px", backgroundColor: "#e0e0e0", p: 1, fontWeight: "bold", borderTopLeftRadius: 4, borderTopRightRadius: 4, cursor: "pointer" }}
                                 >
                                     <Box>{expandedSprints[sprint.id] ? "▼" : "▶"} {sprint.sprint}</Box>
@@ -121,21 +145,19 @@ const CapacityGrid = () => {
                                 </Box>
 
                                 <Collapse in={expandedSprints[sprint.id]} timeout="auto" unmountOnExit>
-                                    <Box sx={{ mt: 1 }}>
-                                        <Box sx={{ margin: 1, display: "grid", gridTemplateColumns: `175px 140px 180px 180px 180px 80px 80px 80px repeat(${dateColumnCount}, 40px) 40px`, fontWeight: "bold", backgroundColor: "#f0f0f0", p: 1 }}>
+                                    <Box sx={{ mt: 2 }}>
+                                        <Box sx={{ margin: .5, display: "grid", gridTemplateColumns: `155px 125px 160px 180px 180px 80px 80px 80px 10px repeat(${dateColumnCount}, 41px) 40px`, fontWeight: "bold", fontSize: 14, backgroundColor: "#f0f0f0", p: 1 }}>
                                             <Box>Member</Box>
-                                            <Box>Team Days Out</Box>
-                                            <Box>Individual Days Out</Box>
-                                            <Box>Individual Days Avail</Box>
-                                            <Box>Total Capacity</Box>
-                                            <Box>Estimate</Box>
-                                            <Box>Planned</Box>
-                                            <Box>Actual</Box>
+                                            <Box sx={{ textAlign: "center" }}>Team Days <br />Out</Box>
+                                            <Box sx={{ textAlign: "center" }}>Individual <br />Days Out</Box>
+                                            <Box sx={{ textAlign: "center" }}>Individual <br />Days Avail</Box>
+                                            <Box sx={{ textAlign: "center" }}>Total Capacity</Box>
+                                            <Box sx={{ textAlign: "center" }}>Estimate</Box>
+                                            <Box sx={{ textAlign: "center" }}>Planned</Box>
+                                            <Box sx={{ textAlign: "center" }}>Actual</Box>
+                                            <Box />
                                             {weekdays.map(({ label, date, key }, i) => (
-                                                <Box
-                                                    key={i}
-                                                    sx={{ textAlign: "center", backgroundColor: pi.holidays.includes(key) ? impactColors.Holiday : pi.companyDays.includes(key) ? impactColors.Company : "transparent" }}
-                                                >
+                                                <Box key={i} sx={{ textAlign: "center", backgroundColor: pi.holidays.includes(key) ? impactColors.Holiday : pi.companyDays.includes(key) ? impactColors.Company : "transparent", borderLeft: i !== 0 ? "4px solid #ccc" : "none" }}>
                                                     <div>{label}</div>
                                                     <div style={{ fontSize: "0.75rem", color: "#666" }}>{date}</div>
                                                 </Box>
@@ -144,27 +166,23 @@ const CapacityGrid = () => {
                                         </Box>
 
                                         {sprint.team.map((member, i) => (
-                                            <Box key={i} sx={{ margin: 1, display: "grid", gridTemplateColumns: `175px 140px 180px 180px 180px 80px 80px 80px repeat(${dateColumnCount}, 40px) 40px`, p: 1, borderBottom: "1px solid #ddd" }}>
-                                                <Select
-                                                    value={member.memberId}
-                                                    onChange={(e) => updateMember(piIndex, sprintIndex, i, "memberId", e.target.value)}
-                                                    variant="standard"
-                                                    displayEmpty
-                                                >
+                                            <Box key={i} sx={{ margin: .5, display: "grid", gridTemplateColumns: `155px 125px 160px 180px 180px 80px 80px 80px 10px repeat(${dateColumnCount}, 41px) 40px`, p: 1, borderBottom: "1px solid #ddd" }}>
+                                                <Select value={member.memberId} onChange={(e) => updateMember(piIndex, sprintIndex, i, "memberId", e.target.value)} variant="standard" displayEmpty>
                                                     <MenuItem value=""><em>Select</em></MenuItem>
                                                     {members.map((m) => (
                                                         <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>
                                                     ))}
                                                 </Select>
-                                                <TextField variant="standard" value={member.teamDaysOut} onChange={(e) => updateMember(piIndex, sprintIndex, i, "teamDaysOut", e.target.value)} inputProps={{ style: { textAlign: 'right' } }} />
-                                                <TextField variant="standard" value={member.individualDaysOut} onChange={(e) => updateMember(piIndex, sprintIndex, i, "individualDaysOut", e.target.value)} inputProps={{ style: { textAlign: 'right' } }} />
-                                                <TextField variant="standard" value={member.individualDaysAvail} onChange={(e) => updateMember(piIndex, sprintIndex, i, "individualDaysAvail", e.target.value)} inputProps={{ style: { textAlign: 'right' } }} />
-                                                <TextField variant="standard" value={member.capacity} onChange={(e) => updateMember(piIndex, sprintIndex, i, "capacity", e.target.value)} inputProps={{ style: { textAlign: 'right' } }} />
-                                                <TextField variant="standard" value={member.p2h} onChange={(e) => updateMember(piIndex, sprintIndex, i, "p2h", e.target.value)} inputProps={{ style: { textAlign: 'right' } }} />
-                                                <TextField variant="standard" value={member.plannedVelocity} onChange={(e) => updateMember(piIndex, sprintIndex, i, "plannedVelocity", e.target.value)} inputProps={{ style: { textAlign: 'right' } }} />
-                                                <TextField variant="standard" value={member.actualVelocity} onChange={(e) => updateMember(piIndex, sprintIndex, i, "actualVelocity", e.target.value)} inputProps={{ style: { textAlign: 'right' } }} />
+                                                <TextField variant="standard" value={member.teamDaysOut} onChange={(e) => updateMember(piIndex, sprintIndex, i, "teamDaysOut", e.target.value)} inputProps={{ style: { textAlign: 'center' } }} />
+                                                <TextField variant="standard" value={member.individualDaysOut} onChange={(e) => updateMember(piIndex, sprintIndex, i, "individualDaysOut", e.target.value)} inputProps={{ style: { textAlign: 'center' } }} />
+                                                <TextField variant="standard" value={member.individualDaysAvail} onChange={(e) => updateMember(piIndex, sprintIndex, i, "individualDaysAvail", e.target.value)} inputProps={{ style: { textAlign: 'center' } }} />
+                                                <TextField variant="standard" value={member.capacity} onChange={(e) => updateMember(piIndex, sprintIndex, i, "capacity", e.target.value)} inputProps={{ style: { textAlign: 'center' } }} />
+                                                <TextField variant="standard" value={member.p2h} onChange={(e) => updateMember(piIndex, sprintIndex, i, "p2h", e.target.value)} inputProps={{ style: { textAlign: 'center' } }} />
+                                                <TextField variant="standard" value={member.plannedVelocity} onChange={(e) => updateMember(piIndex, sprintIndex, i, "plannedVelocity", e.target.value)} inputProps={{ style: { textAlign: 'center' } }} />
+                                                <TextField variant="standard" value={member.actualVelocity} onChange={(e) => updateMember(piIndex, sprintIndex, i, "actualVelocity", e.target.value)} inputProps={{ style: { textAlign: 'center' } }} />
+                                                <Box />
                                                 {weekdays.map(({ key }, idx) => (
-                                                    <Box key={idx} sx={{ backgroundColor: getImpactColor(member, key), borderRadius: 1, textAlign: "center", py: 0.5 }}>
+                                                    <Box key={idx} sx={{ backgroundColor: getImpactColor(member, key), borderRadius: 1, textAlign: "center", py: 0.5, borderLeft: idx !== 0 ? "4px solid white" : "none" }}>
                                                         &nbsp;
                                                     </Box>
                                                 ))}
@@ -172,7 +190,6 @@ const CapacityGrid = () => {
                                                     const updated = [...piData];
                                                     updated[piIndex].sprints[sprintIndex].team.splice(i, 1);
                                                     setPiData(updated);
-
                                                     const enriched = enrichPis(updated, configData);
                                                     await setPis(enriched);
                                                 }} size="small">
@@ -195,7 +212,6 @@ const CapacityGrid = () => {
                                                     actualVelocity: 0
                                                 });
                                                 setPiData(updated);
-
                                                 const enriched = enrichPis(updated, configData);
                                                 await setPis(enriched);
                                             }}>

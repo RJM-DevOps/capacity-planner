@@ -170,10 +170,18 @@ const CapacityGrid = () => {
                                             <Box />
                                             {weekdays.map(({ label, date, key }, i) => {
                                                 const bgColor = pi.holidays.includes(key) ? impactColors.Holiday : pi.companyDays.includes(key) ? impactColors.Company : "transparent";
-                                                const impactType = getColorType(bgColor);
+                                                let tooltip = "";
+                                                if (pi.holidays.includes(key)) {
+                                                    const match = configData["Holidays"]?.find(h => h.date === key);
+                                                    tooltip = `Holiday: ${match?.description || ""}`;
+                                                } else if (pi.companyDays.includes(key)) {
+                                                    const match = configData["Company Days"]?.find(d => d.date === key);
+                                                    tooltip = `Company: ${match?.description || ""}`;
+                                                }
                                                 return (
-                                                    <Tooltip key={i} title={impactType || ""} disableHoverListener={!impactType}>
-                                                        <Box sx={{ textAlign: "center", backgroundColor: bgColor, borderLeft: i !== 0 ? "4px solid #ccc" : "none" }}>
+                                                    <Tooltip key={i} title={tooltip} disableHoverListener={!tooltip}>
+
+                                                    <Box sx={{ textAlign: "center", backgroundColor: bgColor, borderLeft: i !== 0 ? "4px solid #ccc" : "none" }}>
                                                             <div>{label}</div>
                                                             <div style={{ fontSize: "0.75rem", color: "#666" }}>{date}</div>
                                                         </Box>

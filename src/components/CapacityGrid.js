@@ -16,6 +16,10 @@ const impactColors = {
     Other: "#fb05cc"
 };
 
+const getColorType = (color) => {
+    return Object.keys(impactColors).find(key => impactColors[key] === color);
+};
+
 const generateSprintDateColumns = (start, end) => {
     try {
         return eachDayOfInterval({ start: parseISO(start), end: parseISO(end) }).map((date) => ({
@@ -95,6 +99,13 @@ const CapacityGrid = () => {
         return "#e0e0e0";
     };
 
+    const getImpactType = (member, dateKey) => {
+        if ((member.ptoDates || []).includes(dateKey)) return "PTO";
+        if ((member.loaDates || []).includes(dateKey)) return "LOA";
+        if ((member.otherDates || []).includes(dateKey)) return "Other";
+        return null;
+    };
+
     const toggleAllSprints = (piId, expand) => {
         const pi = piData.find(p => p.id === piId);
         if (!pi) return;
@@ -117,7 +128,7 @@ const CapacityGrid = () => {
                         <Box>{format(parseISO(pi.start), "MM/dd/yy")}</Box>
                         <Box>{format(parseISO(pi.end), "MM/dd/yy")}</Box>
                         <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
-                        <Button
+                            <Button
                                 size="small"
                                 onClick={() => toggleAllSprints(pi.id, !Object.values(expandedSprints).some(v => v))}
                                 startIcon={Object.values(expandedSprints).some(v => v) ? <ExpandLessIcon /> : <ExpandMoreIcon />}
@@ -127,6 +138,7 @@ const CapacityGrid = () => {
                                 Toggle Sprints
                             </Button>
                         </Box>
+
                     </Box>
 
                     {expandedPIs[pi.id] && pi.sprints.map((sprint, sprintIndex) => {
@@ -156,12 +168,18 @@ const CapacityGrid = () => {
                                             <Box sx={{ textAlign: "center" }}>Planned</Box>
                                             <Box sx={{ textAlign: "center" }}>Actual</Box>
                                             <Box />
-                                            {weekdays.map(({ label, date, key }, i) => (
-                                                <Box key={i} sx={{ textAlign: "center", backgroundColor: pi.holidays.includes(key) ? impactColors.Holiday : pi.companyDays.includes(key) ? impactColors.Company : "transparent", borderLeft: i !== 0 ? "4px solid #ccc" : "none" }}>
-                                                    <div>{label}</div>
-                                                    <div style={{ fontSize: "0.75rem", color: "#666" }}>{date}</div>
-                                                </Box>
-                                            ))}
+                                            {weekdays.map(({ label, date, key }, i) => {
+                                                const bgColor = pi.holidays.includes(key) ? impactColors.Holiday : pi.companyDays.includes(key) ? impactColors.Company : "transparent";
+                                                const impactType = getColorType(bgColor);
+                                                return (
+                                                    <Tooltip key={i} title={impactType || ""} disableHoverListener={!impactType}>
+                                                        <Box sx={{ textAlign: "center", backgroundColor: bgColor, borderLeft: i !== 0 ? "4px solid #ccc" : "none" }}>
+                                                            <div>{label}</div>
+                                                            <div style={{ fontSize: "0.75rem", color: "#666" }}>{date}</div>
+                                                        </Box>
+                                                    </Tooltip>
+                                                );
+                                            })}
                                             <Box />
                                         </Box>
 
@@ -181,11 +199,17 @@ const CapacityGrid = () => {
                                                 <TextField variant="standard" value={member.plannedVelocity} onChange={(e) => updateMember(piIndex, sprintIndex, i, "plannedVelocity", e.target.value)} inputProps={{ style: { textAlign: 'center' } }} />
                                                 <TextField variant="standard" value={member.actualVelocity} onChange={(e) => updateMember(piIndex, sprintIndex, i, "actualVelocity", e.target.value)} inputProps={{ style: { textAlign: 'center' } }} />
                                                 <Box />
-                                                {weekdays.map(({ key }, idx) => (
-                                                    <Box key={idx} sx={{ backgroundColor: getImpactColor(member, key), borderRadius: 1, textAlign: "center", py: 0.5, borderLeft: idx !== 0 ? "4px solid white" : "none" }}>
-                                                        &nbsp;
-                                                    </Box>
-                                                ))}
+                                                {weekdays.map(({ key }, idx) => {
+                                                    const bgColor = getImpactColor(member, key);
+                                                    const impactType = getImpactType(member, key);
+                                                    return (
+                                                        <Tooltip key={idx} title={impactType || ""} disableHoverListener={!impactType}>
+                                                            <Box sx={{ backgroundColor: bgColor, borderRadius: 1, textAlign: "center", py: 0.5, borderLeft: idx !== 0 ? "4px solid white" : "none" }}>
+                                                                &nbsp;
+                                                            </Box>
+                                                        </Tooltip>
+                                                    );
+                                                })}
                                                 <IconButton onClick={async () => {
                                                     const updated = [...piData];
                                                     updated[piIndex].sprints[sprintIndex].team.splice(i, 1);

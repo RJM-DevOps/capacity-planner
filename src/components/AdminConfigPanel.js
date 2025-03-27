@@ -170,7 +170,7 @@ const AdminConfigPanel = () => {
         else headers = ["Member", "Date"];
 
         return (
-            <Table component={Paper} sx={{ mt: 2 }}>
+            <Table size="small" component={Paper} sx={{ mt: 2 }}>
                 <TableHead>
                     <TableRow>
                         {headers.map((head) => {
@@ -221,13 +221,13 @@ const AdminConfigPanel = () => {
                                     <TableCell key={colIdx}>
                                         {field === "memberId" ? (
                                             <FormControl fullWidth variant="standard">
-                                                <InputLabel>Select Member</InputLabel>
                                                 <Select
                                                     value={row[field] || ""}
                                                     onChange={(e) => handleChange(idx, field, e.target.value)}
                                                     label="Select Member"
                                                     MenuProps={{ PaperProps: { style: { maxHeight: 200 } } }}
                                                     native={false}
+                                                    size="small"
                                                 >
                                                     {members.map((m) => (
                                                         <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>
@@ -248,6 +248,7 @@ const AdminConfigPanel = () => {
                                                 onChange={(e) => handleChange(idx, field, e.target.value)}
                                                 variant="standard"
                                                 disabled={isDisabled}
+                                                size="small"
                                             />
                                         )}
                                     </TableCell>
@@ -273,6 +274,7 @@ const AdminConfigPanel = () => {
                     <Button onClick={() => navigate("/admin/capacity")} variant={location.pathname === "/admin/capacity" ? "contained" : "outlined"}>Capacity Grid</Button>
                     <Button onClick={() => navigate("/admin/panel")} variant={location.pathname === "/admin/panel" ? "contained" : "outlined"}>Admin Panel</Button>
                     <Button onClick={() => navigate("/admin/config")} variant={location.pathname === "/admin/config" ? "contained" : "outlined"}>Config Panel</Button>
+
                 </ButtonGroup>
             </Box>
 

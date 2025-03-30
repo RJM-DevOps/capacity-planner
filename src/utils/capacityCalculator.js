@@ -34,3 +34,12 @@ export const calculateSprintCapacity = ({ weekdays, ptoDates = [], loaDates = []
         p2h
     };
 };
+
+export const getSprintTotalCapacity = (team = []) => {
+    const total = team
+        .filter(member => member.includeInCalc !== false)
+        .reduce((sum, member) => sum + (parseFloat(member.capacity) || 0), 0);
+    return (total/6.2).toFixed(0); // returns a string with 0 decimal places
+};
+
+

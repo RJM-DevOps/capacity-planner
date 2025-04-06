@@ -1,6 +1,6 @@
 # Use official Node.js LTS image
 # FROM chainguard/openjdk:17
-FROM chainguard/node:17
+FROM chainguard/scratch
 
 # Create app directory
 WORKDIR /usr/src/app

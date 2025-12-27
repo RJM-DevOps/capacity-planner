@@ -11,7 +11,12 @@ import {
     TableCell,
     TableBody,
     Paper,
-    IconButton
+    IconButton,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogContentText,
+    DialogTitle
 } from "@mui/material";
 import { Add, Delete } from "@mui/icons-material";
 import { format, addDays, eachDayOfInterval, parseISO } from "date-fns";
@@ -19,6 +24,7 @@ import { format, addDays, eachDayOfInterval, parseISO } from "date-fns";
 const AdminPanel = ({ addPi, pis }) => {
     const [newPi, setNewPi] = useState({ name: "", start: "", end: "" });
     const [piList, setPiList] = useState([]);
+    const [confirmDialog, setConfirmDialog] = useState({ open: false, piIndex: null });
 
     useEffect(() => {
         setPiList(pis);
@@ -58,6 +64,22 @@ const AdminPanel = ({ addPi, pis }) => {
         updatedList[index][field] = value;
         setPiList(updatedList);
         localStorage.setItem("pis", JSON.stringify(updatedList));
+    };
+
+    const confirmDeletePi = (piIndex) => {
+        setConfirmDialog({ open: true, piIndex });
+    };
+
+    const handleConfirmDelete = () => {
+        const updatedList = [...piList];
+        updatedList.splice(confirmDialog.piIndex, 1);
+        setPiList(updatedList);
+        localStorage.setItem("pis", JSON.stringify(updatedList));
+        setConfirmDialog({ open: false, piIndex: null });
+    };
+
+    const handleCancelDelete = () => {
+        setConfirmDialog({ open: false, piIndex: null });
     };
 
     const handleSprintChange = (piIndex, sprintIndex, field, value) => {
@@ -108,9 +130,9 @@ const AdminPanel = ({ addPi, pis }) => {
     return (
         <Box sx={{ p: 3 }}>
             <Typography variant="h5" gutterBottom>Admin Panel</Typography>
-
-            <Box sx={{ mt: 4 }}>
+            <Box sx={{ mt: 4, border: "2px solid #888", borderRadius: 2, p: 2, backgroundColor: "#f9f9f9" }}>
                 <Typography variant="h6">Manage Program Increments (PIs)</Typography>
+                <br />
                 <TextField
                     label="PI Name"
                     value={newPi.name}
@@ -138,135 +160,176 @@ const AdminPanel = ({ addPi, pis }) => {
                 {piList.length > 0 && (
                     <TableContainer component={Paper} sx={{ mt: 3 }}>
                         <Table>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>PI Name</TableCell>
-                                    <TableCell>Start Date</TableCell>
-                                    <TableCell>End Date</TableCell>
-                                </TableRow>
-                            </TableHead>
                             <TableBody>
                                 {piList.map((pi, piIndex) => (
-                                    <React.Fragment key={pi.id}>
-                                        <TableRow>
-                                            <TableCell>
-                                                <TextField
-                                                    value={pi.pi}
-                                                    onChange={(e) => handlePiChange(piIndex, "pi", e.target.value)}
-                                                    variant="standard"
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                <TextField
-                                                    type="date"
-                                                    value={pi.start}
-                                                    onChange={(e) => handlePiChange(piIndex, "start", e.target.value)}
-                                                    variant="standard"
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                <TextField
-                                                    type="date"
-                                                    value={pi.end}
-                                                    onChange={(e) => handlePiChange(piIndex, "end", e.target.value)}
-                                                    variant="standard"
-                                                />
-                                            </TableCell>
-                                        </TableRow>
-                                        <TableRow sx={{ backgroundColor: "#eee" }}>
-                                            <TableCell colSpan={12}>
-                                                <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>Sprints</Typography>
-                                            </TableCell>
-                                        </TableRow>
-                                        <TableRow sx={{ backgroundColor: "#f0f0f0" }}>
-                                            <TableCell>Sprint</TableCell>
-                                            <TableCell>Start</TableCell>
-                                            <TableCell>Finish</TableCell>
-                                            <TableCell>Who</TableCell>
-                                            <TableCell>Team Days Out</TableCell>
-                                            <TableCell>Member Days Out</TableCell>
-                                            <TableCell>Member Days Avail</TableCell>
-                                            <TableCell>Total Capacity</TableCell>
-                                            <TableCell>Estimate</TableCell>
-                                            <TableCell>Planned</TableCell>
-                                            <TableCell>Actual</TableCell>
-                                            <TableCell>Days</TableCell>
-                                        </TableRow>
-                                        {pi.sprints.map((sprint, sprintIndex) => {
-                                            const weekdayHeaders = generateSprintDateColumns(sprint.start, sprint.end);
-                                            return (
-                                                <TableRow key={sprint.id} sx={{ backgroundColor: "#f5f5f5" }}>
-                                                    <TableCell>
-                                                        <TextField
-                                                            value={sprint.sprint}
-                                                            onChange={(e) => handleSprintChange(piIndex, sprintIndex, "sprint", e.target.value)}
-                                                            variant="standard"
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <TextField
-                                                            type="date"
-                                                            value={sprint.start}
-                                                            onChange={(e) => handleSprintChange(piIndex, sprintIndex, "start", e.target.value)}
-                                                            variant="standard"
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <TextField
-                                                            type="date"
-                                                            value={sprint.end}
-                                                            onChange={(e) => handleSprintChange(piIndex, sprintIndex, "end", e.target.value)}
-                                                            variant="standard"
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <TextField
-                                                            value={sprint.who}
-                                                            onChange={(e) => handleSprintChange(piIndex, sprintIndex, "who", e.target.value)}
-                                                            variant="standard"
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell><TextField value={sprint.teamDaysOut} onChange={(e) => handleSprintChange(piIndex, sprintIndex, "teamDaysOut", e.target.value)} variant="standard" /></TableCell>
-                                                    <TableCell><TextField value={sprint.individualDaysOut} onChange={(e) => handleSprintChange(piIndex, sprintIndex, "individualDaysOut", e.target.value)} variant="standard" /></TableCell>
-                                                    <TableCell><TextField value={sprint.individualDaysAvail} onChange={(e) => handleSprintChange(piIndex, sprintIndex, "individualDaysAvail", e.target.value)} variant="standard" /></TableCell>
-                                                    <TableCell><TextField value={sprint.capacity} onChange={(e) => handleSprintChange(piIndex, sprintIndex, "capacity", e.target.value)} variant="standard" /></TableCell>
-                                                    <TableCell><TextField value={sprint.p2h} onChange={(e) => handleSprintChange(piIndex, sprintIndex, "p2h", e.target.value)} variant="standard" /></TableCell>
-                                                    <TableCell><TextField value={sprint.plannedVelocity} onChange={(e) => handleSprintChange(piIndex, sprintIndex, "plannedVelocity", e.target.value)} variant="standard" /></TableCell>
-                                                    <TableCell><TextField value={sprint.actualVelocity} onChange={(e) => handleSprintChange(piIndex, sprintIndex, "actualVelocity", e.target.value)} variant="standard" /></TableCell>
-                                                    <TableCell>
-                                                        <Box sx={{ display: "flex", gap: 1 }}>
-                                                            {weekdayHeaders.map((day, i) => (
-                                                                <Box
-                                                                    key={i}
+                                    <TableRow key={pi.id}>
+                                        <TableCell colSpan={4} sx={{ p: 0 }}>
+                                            <Box
+                                                sx={{
+                                                    border: "2px solid slategray",
+                                                    borderRadius: 2,
+                                                    m: 1,
+                                                    p: 1,
+                                                    backgroundColor: "rgba(25, 118, 210, 0.2)",
+                                                    boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.4)"
+                                                }}
+                                            >
+                                                <Table size="small">
+                                                    <TableHead>
+                                                        <TableRow>
+                                                            <TableCell>PI Name</TableCell>
+                                                            <TableCell>Start Date</TableCell>
+                                                            <TableCell>End Date</TableCell>
+                                                            <TableCell align="right">
+                                                                <Button
+                                                                    variant="outlined"
+                                                                    color="error"
+                                                                    size="small"
+                                                                    onClick={() => confirmDeletePi(piIndex)}
                                                                     sx={{
-                                                                        px: 1,
-                                                                        py: 0.5,
-                                                                        borderRadius: "4px",
-                                                                        backgroundColor: "#e0e0e0",
-                                                                        fontSize: "0.75rem"
+                                                                        backgroundColor: "white",
+                                                                        boxShadow: "2px 4px 8px rgba(0, 0, 0, 0.2)", // 👈 subtle shadow
+                                                                        '&:hover': {
+                                                                            backgroundColor: "#f8d7da",
+                                                                            boxShadow: "2px 4px 8px rgba(0, 0, 0, 0.3)" // stronger on hover
+                                                                        }
                                                                     }}
                                                                 >
-                                                                    {day}
-                                                                </Box>
-                                                            ))}
-                                                            <IconButton onClick={() => handleAddSprint(piIndex)} size="small" color="primary">
-                                                                <Add fontSize="small" />
-                                                            </IconButton>
-                                                            <IconButton onClick={() => handleDeleteSprint(piIndex, sprintIndex)} size="small" color="error">
-                                                                <Delete fontSize="small" />
-                                                            </IconButton>
-                                                        </Box>
-                                                    </TableCell>
-                                                </TableRow>
-                                            );
-                                        })}
-                                    </React.Fragment>
+                                                                    Delete PI
+                                                                </Button>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    </TableHead>
+                                                    <TableBody>
+                                                        <TableRow>
+                                                            <TableCell>
+                                                                <TextField
+                                                                    value={pi.pi}
+                                                                    onChange={(e) => handlePiChange(piIndex, "pi", e.target.value)}
+                                                                    variant="standard"
+                                                                />
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <TextField
+                                                                    type="date"
+                                                                    value={pi.start}
+                                                                    onChange={(e) => handlePiChange(piIndex, "start", e.target.value)}
+                                                                    variant="standard"
+                                                                />
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <TextField
+                                                                    type="date"
+                                                                    value={pi.end}
+                                                                    onChange={(e) => handlePiChange(piIndex, "end", e.target.value)}
+                                                                    variant="standard"
+                                                                />
+                                                            </TableCell>
+                                                            <TableCell />
+                                                        </TableRow>
+                                                        <TableRow sx={{ backgroundColor: "#f0f0f0", border: "2px solid slategray", borderTopLeftRadius: 8, borderTopRightRadius: 8 }}>
+                                                            <TableCell>Sprint</TableCell>
+                                                            <TableCell>Start</TableCell>
+                                                            <TableCell>Finish</TableCell>
+                                                            <TableCell />
+                                                            {/**
+                                                             <TableCell>Team Days Out</TableCell>
+                                                             <TableCell>Member Days Out</TableCell>
+                                                             <TableCell>Member Days Avail</TableCell>
+                                                             <TableCell>Total Capacity</TableCell>
+                                                             <TableCell>Estimate</TableCell>
+                                                             <TableCell>Planned</TableCell>
+                                                             <TableCell>Actual</TableCell>
+                                                             <TableCell>Days</TableCell>
+                                                             **/}
+                                                        </TableRow>
+                                                        {pi.sprints.map((sprint, sprintIndex) => {
+                                                            const weekdayHeaders = generateSprintDateColumns(sprint.start, sprint.end);
+                                                            const isLast = sprintIndex === pi.sprints.length - 1;
+                                                            return (
+                                                                <TableRow
+                                                                    key={sprint.id}
+                                                                    sx={{
+                                                                        backgroundColor: "#f5f5f5",
+                                                                        borderLeft: "2px solid slategray",
+                                                                        borderRight: "2px solid slategray",
+                                                                        borderBottom: isLast ? "2px solid slategray" : undefined
+                                                                    }}
+                                                                >
+                                                                    <TableCell>
+                                                                        <TextField
+                                                                            value={sprint.sprint}
+                                                                            onChange={(e) => handleSprintChange(piIndex, sprintIndex, "sprint", e.target.value)}
+                                                                            variant="standard"
+                                                                        />
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <TextField
+                                                                            type="date"
+                                                                            value={sprint.start}
+                                                                            onChange={(e) => handleSprintChange(piIndex, sprintIndex, "start", e.target.value)}
+                                                                            variant="standard"
+                                                                        />
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <TextField
+                                                                            type="date"
+                                                                            value={sprint.end}
+                                                                            onChange={(e) => handleSprintChange(piIndex, sprintIndex, "end", e.target.value)}
+                                                                            variant="standard"
+                                                                        />
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <Box sx={{ display: "flex", gap: 1 }}>
+                                                                            {weekdayHeaders.map((day, i) => (
+                                                                                <Box
+                                                                                    key={i}
+                                                                                    sx={{
+                                                                                        px: 1,
+                                                                                        py: 0.5,
+                                                                                        borderRadius: "4px",
+                                                                                        backgroundColor: "#e0e0e0",
+                                                                                        fontSize: "0.75rem"
+                                                                                    }}
+                                                                                >
+                                                                                    {day}
+                                                                                </Box>
+                                                                            ))}
+                                                                            <IconButton onClick={() => handleAddSprint(piIndex)} size="small" color="primary">
+                                                                                <Add fontSize="small" />
+                                                                            </IconButton>
+                                                                            <IconButton onClick={() => handleDeleteSprint(piIndex, sprintIndex)} size="small" color="error">
+                                                                                <Delete fontSize="small" />
+                                                                            </IconButton>
+                                                                        </Box>
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            );
+                                                        })}
+                                                    </TableBody>
+                                                </Table>
+                                            </Box>
+                                        </TableCell>
+                                    </TableRow>
                                 ))}
                             </TableBody>
                         </Table>
                     </TableContainer>
                 )}
             </Box>
+
+            <Dialog open={confirmDialog.open} onClose={handleCancelDelete}>
+                <DialogTitle>Confirm Deletion</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        This will delete the PI and all associated sprints. Do you want to continue?
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCancelDelete} color="primary">Cancel</Button>
+                    <Button onClick={handleConfirmDelete} color="error" autoFocus>Delete</Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

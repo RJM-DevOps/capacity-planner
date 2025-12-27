@@ -27,24 +27,36 @@ const Login = () => {
         <Box sx={{ p: 3, maxWidth: 400, mx: "auto", textAlign: "center" }}>
             <Typography variant="h5" gutterBottom>Login</Typography>
             {error && <Typography color="error">{error}</Typography>}
-            <TextField
-                label="Username"
-                fullWidth
-                margin="normal"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-            />
-            <TextField
-                label="Password"
-                type="password"
-                fullWidth
-                margin="normal"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-            />
-            <Button variant="contained" color="primary" fullWidth sx={{ mt: 2 }} onClick={handleLogin}>
-                Login
-            </Button>
+
+            <form onSubmit={(e) => {
+                e.preventDefault(); // prevent page reload
+                handleLogin(); // run the login logic
+            }}>
+                <TextField
+                    label="Username"
+                    fullWidth
+                    margin="normal"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                />
+                <TextField
+                    label="Password"
+                    type="password"
+                    fullWidth
+                    margin="normal"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                />
+                <Button
+                    type="submit"
+                    variant="contained"
+                    color="primary"
+                    fullWidth
+                    sx={{ mt: 2 }}
+                >
+                    Login
+                </Button>
+            </form>
         </Box>
     );
 };

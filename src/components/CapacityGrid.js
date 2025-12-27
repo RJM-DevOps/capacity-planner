@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from "react";
-import { Box, Typography, TextField, IconButton, Collapse, Button, MenuItem, Select, Tooltip } from "@mui/material";
+import React, { useState, useEffect, useRef } from "react";
+import { Box, Typography, TextField, IconButton, Collapse, Button, MenuItem, Select, Tooltip, Switch, FormControlLabel } from "@mui/material";
 import { getPis, setPis } from "../utils/storageProvider";
 import { format, eachDayOfInterval, parseISO, isWeekend } from "date-fns";
 import { motion } from "framer-motion";
@@ -10,6 +10,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { calculateSprintCapacity } from "../utils/capacityCalculator";
+import { getSprintTotalCapacity } from "../utils/capacityCalculator";
 import "./CapacityGrid.css";
 
 const impactColors = {
@@ -24,13 +25,15 @@ const getColorType = (color) => {
     return Object.keys(impactColors).find(key => impactColors[key] === color);
 };
 
-const generateSprintDateColumns = (start, end) => {
+const generateSprintDateColumns = (start, end, includeWeekends = true) => {
     try {
-        return eachDayOfInterval({ start: parseISO(start), end: parseISO(end) }).map((date) => ({
-            key: format(date, "yyyy-MM-dd"),
-            label: format(date, "EEE"),
-            date: format(date, "M/d"),
-        }));
+        return eachDayOfInterval({ start: parseISO(start), end: parseISO(end) })
+            .filter(date => includeWeekends || !isWeekend(date))
+            .map((date) => ({
+                key: format(date, "yyyy-MM-dd"),
+                label: format(date, "EEE"),
+                date: format(date, "M/d"),
+            }));
     } catch {
         return [];
     }
@@ -43,6 +46,8 @@ const enrichPis = (pis, config) => {
     const holidays = Array.isArray(config["Holidays"]) ? config["Holidays"] : [];
     const companyDays = Array.isArray(config["Company Days"]) ? config["Company Days"] : [];
     const adjustments = Array.isArray(config["Adjustments"]) ? config["Adjustments"] : [];
+
+    const memberDirectory = JSON.parse(localStorage.getItem("memberDirectory") || "[]"); // ✅ Lookup source
 
     return pis.map((pi) => ({
         ...pi,
@@ -58,6 +63,7 @@ const enrichPis = (pis, config) => {
 
             const team = (sprint.team || []).map((member) => {
                 const memberId = member.memberId || "";
+                const memberMeta = memberDirectory.find(m => m.id === memberId);
 
                 const ptoDates = ptoData.filter(d => d.memberId === memberId).map(d => d.date);
                 const loaDates = loaData.filter(d => d.memberId === memberId).map(d => d.date);
@@ -74,6 +80,7 @@ const enrichPis = (pis, config) => {
                 return {
                     ...member,
                     memberId,
+                    includeInCalc: memberMeta?.includeInCalc ?? true, // ✅ Respect member setting
                     ptoDates,
                     loaDates,
                     otherDates,
@@ -82,7 +89,12 @@ const enrichPis = (pis, config) => {
                 };
             });
 
-            return { ...sprint, team };
+            const totalSprintVelocity = team
+                .filter(member => member.includeInCalc !== false)
+                .reduce((sum, member) => sum + (parseFloat(member.p2h) || 0), 0)
+                .toFixed(0);
+
+            return { ...sprint, team, totalSprintVelocity };
         })
     }));
 };
@@ -94,6 +106,14 @@ const CapacityGrid = () => {
     const [piData, setPiData] = useState([]);
     const [members, setMembers] = useState([]);
     const memberSettings = JSON.parse(localStorage.getItem("memberDirectory") || "[]");
+    const [showWeekends, setShowWeekends] = useState(true);
+    const hasInitializedShowWeekends = useRef(false);
+    const toggleWeekendsForPi = (piId) => {
+        setShowWeekends((prev) => ({
+            ...prev,
+            [piId]: !prev[piId]
+        }));
+    };
 
     useEffect(() => {
         const fetchData = async () => {
@@ -105,6 +125,10 @@ const CapacityGrid = () => {
             const config = JSON.parse(localStorage.getItem("configData") || "{}");
             setConfigData(config);
 
+            const storedShowWeekends = JSON.parse(localStorage.getItem("showWeekends") || "{}");
+            setShowWeekends(storedShowWeekends);
+            hasInitializedShowWeekends.current = true; // ✅ only allow update once
+
             const pis = await getPis();
             const enriched = enrichPis(pis || [], config);
             setPiData(enriched);
@@ -112,6 +136,30 @@ const CapacityGrid = () => {
 
         fetchData();
     }, []);
+
+    useEffect(() => {
+        if (!hasInitializedShowWeekends.current) return; // ⛔ don’t overwrite on first load
+
+        setShowWeekends(prev => {
+            const updated = { ...prev };
+            let changed = false;
+
+            piData.forEach(pi => {
+                if (!(pi.id in updated)) {
+                    updated[pi.id] = true;
+                    changed = true;
+                }
+            });
+
+            return changed ? updated : prev;
+        });
+    }, [piData]);
+
+
+
+    useEffect(() => {
+        localStorage.setItem("showWeekends", JSON.stringify(showWeekends));
+    }, [showWeekends]);
 
     useEffect(() => {
         localStorage.setItem("expandedPIs", JSON.stringify(expandedPIs));
@@ -127,7 +175,7 @@ const CapacityGrid = () => {
         if ((member.ptoDates || []).includes(dateKey)) return impactColors.PTO;
         if ((member.loaDates || []).includes(dateKey)) return impactColors.LOA;
         if ((member.otherDates || []).includes(dateKey)) return impactColors.Other;
-        return "#e0e0e0";
+        return "#084564";
     };
 
     const getImpactType = (member, dateKey) => {
@@ -171,30 +219,67 @@ const CapacityGrid = () => {
             <Typography variant="h5" gutterBottom>Capacity Planning Grid</Typography>
             {piData.map((pi, piIndex) => (
                 <Box key={pi.id} sx={{ mb: 3 }}>
-                    <Box sx={{ display: "grid", gridTemplateColumns: "200px 150px 150px 1fr", border: "1px solid #888",
-                        fontWeight: "bold", background: "linear-gradient(to right, #a8a9ab, #d6d5d5)", p: 1, borderRadius: 1 }}>
+                    <Box
+                        sx={{
+                            display: "grid",
+                            alignItems: "center",
+                            gridTemplateColumns: "200px 150px 150px 1fr",
+                            border: "1px solid #888",
+                            fontWeight: "bold",
+                            background: "linear-gradient(to right, rgba(25, 118, 210, 0.5), rgba(25, 118, 210, 0.15))",
+                            boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.4)", p: 1,
+                            borderRadius: 1
+                        }}
+                    >
                         <Box onClick={() => setExpandedPIs(prev => ({ ...prev, [pi.id]: !prev[pi.id] }))} sx={{ cursor: "pointer" }}>
                             {expandedPIs[pi.id] ? "▼" : "▶"} {pi.pi}
                         </Box>
                         <Box>{format(parseISO(pi.start), "MM/dd/yy")}</Box>
                         <Box>{format(parseISO(pi.end), "MM/dd/yy")}</Box>
-                        <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
+                        <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 2 }}>
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={!!showWeekends[pi.id]}
+                                        onChange={() => toggleWeekendsForPi(pi.id)}
+                                        color="primary"
+                                    />
+                                }
+                                label="Show Weekends"
+                                sx={{ color: "darkslategray", mr: 2 }}
+                            />
+
                             <Button
                                 size="small"
                                 onClick={() => toggleAllSprints(pi.id)}
-                                startIcon={Object.values(expandedSprints).some(v => v) ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                                startIcon={
+                                    <ExpandMoreIcon
+                                        sx={{
+                                            transition: "transform 0.3s ease-in-out",
+                                            transform: pi.sprints.some(s => expandedSprints[s.id]) ? "rotate(180deg)" : "rotate(0deg)"
+                                        }}
+                                    />
+                                }
                                 sx={{
                                     color: "darkslategray",
+                                    width: "180px",
+                                    boxShadow: "2px 2px 4px rgba(0, 0, 0, 0.3)",
+                                    background: pi.sprints.some(s => expandedSprints[s.id])
+                                        ? "linear-gradient(90deg, rgba(204, 227, 250, 0.7) 0%, white 95%)"
+                                        : "linear-gradient(90deg, white 5%, rgba(204, 227, 250, 0.7) 100%)",
                                     borderColor: "darkslategray",
                                     '&:hover': {
-                                        backgroundColor: "#e3f2fd" // light blue on hover (optional)
-                                    }
+                                        background: pi.sprints.some(s => expandedSprints[s.id])
+                                            ? "linear-gradient(90deg, white 5%, rgba(204, 227, 250, 0.7) 100%)"
+                                            : "linear-gradient(90deg, rgba(204, 227, 250, 0.7) 0%, white 95%)",
+                                        boxShadow: "4px 4px 8px rgba(0, 0, 0, 0.3)" // stronger on hover
+                                    },
+                                    transition: "background 0.3s ease-in-out",
                                 }}
                                 variant="outlined"
                             >
-                                Toggle Sprints
+                                {pi.sprints.some(s => expandedSprints[s.id]) ? "Collapse Sprints" : "Expand Sprints"}
                             </Button>
-
 
                             {/* Animate the toggle buttons - comment the above btn out 1st! */}
                             {/*
@@ -231,15 +316,15 @@ const CapacityGrid = () => {
                     </Box>
                     {expandedPIs[pi.id] && pi.sprints.map((sprint, sprintIndex) => {
                         //const weekdays = generateSprintDateColumns(sprint.start, sprint.end).filter(d => !isWeekend(parseISO(d.key)));
-                        const weekdays = generateSprintDateColumns(sprint.start, sprint.end);
+                        const weekdays = generateSprintDateColumns(sprint.start, sprint.end, !!showWeekends[pi.id]);
                         const dateColumnCount = weekdays.length;
                         return (
-                            <Box key={sprint.id} sx={{ mt: 2, ml: 2 }}>
+                            <Box key={sprint.id} sx={{ mt: 2, ml: 2, border: "1px solid #888" }}>
                                 <Box
                                     sx={{
                                         display: "grid",
                                         gridTemplateColumns: "185px 150px 150px 1fr",
-                                        backgroundColor: "#d6d5d5",
+                                        backgroundColor: "#E3E2E2",
                                         p: 1,
                                         fontWeight: "bold",
                                         borderTopLeftRadius: 4,
@@ -258,18 +343,37 @@ const CapacityGrid = () => {
                                     >
                                         {expandedSprints[sprint.id] ? "▼" : "▶"} {sprint.sprint}
                                     </Box>
+
                                     <Box>{format(parseISO(sprint.start), "MM/dd/yy")}</Box>
                                     <Box>{format(parseISO(sprint.end), "MM/dd/yy")}</Box>
-                                    <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+
+                                    {/* Add Sprint Total Capacity Here */}
+                                    <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12 }}>
+                                        <Box sx={{ fontWeight: "normal" }}>
+                                            Total Capacity:{" "}
+                                            <strong
+                                                style={{
+                                                    color: "#0c628f"
+                                                    //textShadow: "1px 1px 2px rgba(0, 0, 0, 0.4)"
+                                                }}
+                                            >
+                                                {getSprintTotalCapacity(sprint.team)}
+                                            </strong>
+                                        </Box>
+
+
                                         <Button
                                             variant="outlined"
                                             size="small"
                                             startIcon={<AddIcon />}
                                             disabled={!expandedSprints[sprint.id]}
                                             sx={{
+                                                width: "160px",
                                                 backgroundColor: "white",
-                                                "&:hover": {
-                                                    backgroundColor: "white"
+                                                boxShadow: "2px 2px 4px rgba(0, 0, 0, 0.3)", // 👈 subtle shadow
+                                                '&:hover': {
+                                                    backgroundColor: "whitesmoke",
+                                                    boxShadow: "4px 4px 8px rgba(0, 0, 0, 0.3)" // stronger on hover
                                                 }
                                             }}
                                             onClick={async () => {
@@ -333,7 +437,7 @@ const CapacityGrid = () => {
                                                             sx={{
                                                                 textAlign: "center",
                                                                 backgroundColor: bgColor,
-                                                                borderLeft: i !== 0 ? "4px solid #ccc" : "none"
+                                                                borderLeft: i !== 0 ? "2px solid gray" : "none"
                                                             }}
                                                         >
                                                             <div>{label}</div>
@@ -422,7 +526,7 @@ const CapacityGrid = () => {
                                                     setPiData(enriched);
                                                     await setPis(enriched);
                                                 }} size="small">
-                                                    <DeleteIcon fontSize="small" />
+                                                    <DeleteIcon fontSize="small" sx={{ color: "#de3939" }} />
                                                 </IconButton>
                                             </Box>
                                         ))}

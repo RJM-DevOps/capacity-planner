@@ -1,4 +1,5 @@
 const isLocal = process.env.REACT_APP_USE_LOCAL_STORAGE === "true";
+console.log(`🔧 Using ${isLocal ? "localStorage" : "backend API"} for retrieving and setting PI data`);
 
 // Fetch PI data
 export const getPis = async () => {

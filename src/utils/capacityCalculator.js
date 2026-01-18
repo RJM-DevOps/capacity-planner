@@ -21,8 +21,8 @@ export const calculateSprintCapacity = ({ weekdays, ptoDates = [], loaDates = []
     ).length;
 
     const individualDaysAvail = weekdayStrings.length - teamDaysOut - individualDaysOut;
-    const capacity = parseFloat((individualDaysAvail * 6.2).toFixed(0));
-    const estimatedVelocity = parseFloat((capacity / 6.2).toFixed(0));
+    const capacity = parseFloat((individualDaysAvail * 6.8).toFixed(0));
+    const estimatedVelocity = parseFloat((capacity / 6.8).toFixed(0));
     const p2h = estimatedVelocity;
 
     return {
@@ -33,4 +33,11 @@ export const calculateSprintCapacity = ({ weekdays, ptoDates = [], loaDates = []
         estimatedVelocity,
         p2h
     };
+};
+
+export const getSprintTotalCapacity = (team = []) => {
+    const total = team
+        .filter(member => member.includeInCalc !== false)
+        .reduce((sum, member) => sum + (parseFloat(member.capacity) || 0), 0);
+    return (total/6.8).toFixed(0); // returns a string with 0 decimal places
 };
